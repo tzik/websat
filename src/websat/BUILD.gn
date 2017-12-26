@@ -2,6 +2,7 @@
 executable("websat") {
   deps = [
     "../irt",
+    "../minisat",
   ]
 
   sources = [

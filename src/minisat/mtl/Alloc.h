@@ -21,6 +21,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #ifndef Minisat_Alloc_h
 #define Minisat_Alloc_h
 
+#include "irt/types.h"
 #include "minisat/mtl/XAlloc.h"
 #include "minisat/mtl/Vec.h"
 
@@ -32,10 +33,10 @@ namespace Minisat {
 template<class T>
 class RegionAllocator
 {
-    T*        memory;
-    uint32_t  sz;
-    uint32_t  cap;
-    uint32_t  wasted_;
+    T*        memory = nullptr;
+    uint32_t  sz = 0;
+    uint32_t  cap = 0;
+    uint32_t  wasted_ = 0;
 
     void capacity(uint32_t min_cap);
 
@@ -45,11 +46,10 @@ class RegionAllocator
     enum { Ref_Undef = UINT32_MAX };
     enum { Unit_Size = sizeof(T) };
 
-    explicit RegionAllocator(uint32_t start_cap = 1024*1024) : memory(NULL), sz(0), cap(0), wasted_(0){ capacity(start_cap); }
+    explicit RegionAllocator(uint32_t start_cap = 1024*1024) { capacity(start_cap); }
     ~RegionAllocator()
     {
-        if (memory != NULL)
-            ::free(memory);
+        ::free(memory);
     }
 
 
@@ -69,13 +69,13 @@ class RegionAllocator
         return  (Ref)(t - &memory[0]); }
 
     void     moveTo(RegionAllocator& to) {
-        if (to.memory != NULL) ::free(to.memory);
+        ::free(to.memory);
         to.memory = memory;
         to.sz = sz;
         to.cap = cap;
         to.wasted_ = wasted_;
 
-        memory = NULL;
+        memory = nullptr;
         sz = cap = wasted_ = 0;
     }
 
@@ -97,7 +97,7 @@ void RegionAllocator<T>::capacity(uint32_t min_cap)
         cap += delta;
 
         if (cap <= prev_cap)
-            throw OutOfMemoryException();
+            trap("OOM");
     }
     // printf(" .. (%p) cap = %u\n", this, cap);
 
@@ -119,7 +119,7 @@ RegionAllocator<T>::alloc(int size)
     
     // Handle overflow:
     if (sz < prev_sz)
-        throw OutOfMemoryException();
+        trap("OOM");
 
     return prev_sz;
 }

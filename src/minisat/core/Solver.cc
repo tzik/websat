@@ -18,11 +18,11 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **************************************************************************************************/
 
-#include <math.h>
+#include "irt/irt.h"
+#include "irt/env.h"
 
 #include "minisat/mtl/Alg.h"
 #include "minisat/mtl/Sort.h"
-#include "minisat/utils/System.h"
 #include "minisat/core/Solver.h"
 
 using namespace Minisat;
@@ -30,21 +30,18 @@ using namespace Minisat;
 //=================================================================================================
 // Options:
 
-
-static const char* _cat = "CORE";
-
-static DoubleOption  opt_var_decay         (_cat, "var-decay",   "The variable activity decay factor",            0.95,     DoubleRange(0, false, 1, false));
-static DoubleOption  opt_clause_decay      (_cat, "cla-decay",   "The clause activity decay factor",              0.999,    DoubleRange(0, false, 1, false));
-static DoubleOption  opt_random_var_freq   (_cat, "rnd-freq",    "The frequency with which the decision heuristic tries to choose a random variable", 0, DoubleRange(0, true, 1, true));
-static DoubleOption  opt_random_seed       (_cat, "rnd-seed",    "Used by the random variable selection",         91648253, DoubleRange(0, false, HUGE_VAL, false));
-static IntOption     opt_ccmin_mode        (_cat, "ccmin-mode",  "Controls conflict clause minimization (0=none, 1=basic, 2=deep)", 2, IntRange(0, 2));
-static IntOption     opt_phase_saving      (_cat, "phase-saving", "Controls the level of phase saving (0=none, 1=limited, 2=full)", 2, IntRange(0, 2));
-static BoolOption    opt_rnd_init_act      (_cat, "rnd-init",    "Randomize the initial activity", false);
-static BoolOption    opt_luby_restart      (_cat, "luby",        "Use the Luby restart sequence", true);
-static IntOption     opt_restart_first     (_cat, "rfirst",      "The base restart interval", 100, IntRange(1, INT32_MAX));
-static DoubleOption  opt_restart_inc       (_cat, "rinc",        "Restart interval increase factor", 2, DoubleRange(1, false, HUGE_VAL, false));
-static DoubleOption  opt_garbage_frac      (_cat, "gc-frac",     "The fraction of wasted memory allowed before a garbage collection is triggered",  0.20, DoubleRange(0, false, HUGE_VAL, false));
-static IntOption     opt_min_learnts_lim   (_cat, "min-learnts", "Minimum learnt clause limit",  0, IntRange(0, INT32_MAX));
+static double  opt_var_decay       = 0.95;
+static double  opt_clause_decay    = 0.999;
+static double  opt_random_var_freq = 0;
+static double  opt_random_seed     = 91648253;
+static int     opt_ccmin_mode      = 2;
+static int     opt_phase_saving    = 2;
+static bool    opt_rnd_init_act    = false;
+static bool    opt_luby_restart    = true;
+static int     opt_restart_first   = 100;
+static double  opt_restart_inc     = 2;
+static double  opt_garbage_frac    = 0.20;
+static int     opt_min_learnts_lim = 0;
 
 
 //=================================================================================================
@@ -735,12 +732,6 @@ lbool Solver::search(int nof_conflicts)
                 learntsize_adjust_confl *= learntsize_adjust_inc;
                 learntsize_adjust_cnt    = (int)learntsize_adjust_confl;
                 max_learnts             *= learntsize_inc;
-
-                if (verbosity >= 1)
-                    printf("| %9d | %7d %8d %8d | %8d %8d %6.0f | %6.3f %% |\n", 
-                           (int)conflicts, 
-                           (int)dec_vars - (trail_lim.size() == 0 ? trail.size() : trail_lim[0]), nClauses(), (int)clauses_literals, 
-                           (int)max_learnts, nLearnts(), (double)learnts_literals/nLearnts(), progressEstimate()*100);
             }
 
         }else{
@@ -852,13 +843,6 @@ lbool Solver::solve_()
     learntsize_adjust_cnt     = (int)learntsize_adjust_confl;
     lbool   status            = l_Undef;
 
-    if (verbosity >= 1){
-        printf("============================[ Search Statistics ]==============================\n");
-        printf("| Conflicts |          ORIGINAL         |          LEARNT          | Progress |\n");
-        printf("|           |    Vars  Clauses Literals |    Limit  Clauses Lit/Cl |          |\n");
-        printf("===============================================================================\n");
-    }
-
     // Search:
     int curr_restarts = 0;
     while (status == l_Undef){
@@ -867,10 +851,6 @@ lbool Solver::solve_()
         if (!withinBudget()) break;
         curr_restarts++;
     }
-
-    if (verbosity >= 1)
-        printf("===============================================================================\n");
-
 
     if (status == l_True){
         // Extend & copy model:
@@ -909,98 +889,6 @@ bool Solver::implies(const vec<Lit>& assumps, vec<Lit>& out)
     cancelUntil(0);
     return ret;
 }
-
-//=================================================================================================
-// Writing CNF to DIMACS:
-// 
-// FIXME: this needs to be rewritten completely.
-
-static Var mapVar(Var x, vec<Var>& map, Var& max)
-{
-    if (map.size() <= x || map[x] == -1){
-        map.growTo(x+1, -1);
-        map[x] = max++;
-    }
-    return map[x];
-}
-
-
-void Solver::toDimacs(FILE* f, Clause& c, vec<Var>& map, Var& max)
-{
-    if (satisfied(c)) return;
-
-    for (int i = 0; i < c.size(); i++)
-        if (value(c[i]) != l_False)
-            fprintf(f, "%s%d ", sign(c[i]) ? "-" : "", mapVar(var(c[i]), map, max)+1);
-    fprintf(f, "0\n");
-}
-
-
-void Solver::toDimacs(const char *file, const vec<Lit>& assumps)
-{
-    FILE* f = fopen(file, "wr");
-    if (f == NULL)
-        fprintf(stderr, "could not open file %s\n", file), exit(1);
-    toDimacs(f, assumps);
-    fclose(f);
-}
-
-
-void Solver::toDimacs(FILE* f, const vec<Lit>& assumps)
-{
-    // Handle case when solver is in contradictory state:
-    if (!ok){
-        fprintf(f, "p cnf 1 2\n1 0\n-1 0\n");
-        return; }
-
-    vec<Var> map; Var max = 0;
-
-    // Cannot use removeClauses here because it is not safe
-    // to deallocate them at this point. Could be improved.
-    int cnt = 0;
-    for (int i = 0; i < clauses.size(); i++)
-        if (!satisfied(ca[clauses[i]]))
-            cnt++;
-        
-    for (int i = 0; i < clauses.size(); i++)
-        if (!satisfied(ca[clauses[i]])){
-            Clause& c = ca[clauses[i]];
-            for (int j = 0; j < c.size(); j++)
-                if (value(c[j]) != l_False)
-                    mapVar(var(c[j]), map, max);
-        }
-
-    // Assumptions are added as unit clauses:
-    cnt += assumps.size();
-
-    fprintf(f, "p cnf %d %d\n", max, cnt);
-
-    for (int i = 0; i < assumps.size(); i++){
-        assert(value(assumps[i]) != l_False);
-        fprintf(f, "%s%d 0\n", sign(assumps[i]) ? "-" : "", mapVar(var(assumps[i]), map, max)+1);
-    }
-
-    for (int i = 0; i < clauses.size(); i++)
-        toDimacs(f, ca[clauses[i]], map, max);
-
-    if (verbosity > 0)
-        printf("Wrote DIMACS with %d variables and %d clauses.\n", max, cnt);
-}
-
-
-void Solver::printStats() const
-{
-    double cpu_time = cpuTime();
-    double mem_used = memUsedPeak();
-    printf("restarts              : %"PRIu64"\n", starts);
-    printf("conflicts             : %-12"PRIu64"   (%.0f /sec)\n", conflicts   , conflicts   /cpu_time);
-    printf("decisions             : %-12"PRIu64"   (%4.2f %% random) (%.0f /sec)\n", decisions, (float)rnd_decisions*100 / (float)decisions, decisions   /cpu_time);
-    printf("propagations          : %-12"PRIu64"   (%.0f /sec)\n", propagations, propagations/cpu_time);
-    printf("conflict literals     : %-12"PRIu64"   (%4.2f %% deleted)\n", tot_literals, (max_literals - tot_literals)*100 / (double)max_literals);
-    if (mem_used != 0) printf("Memory used           : %.2f MB\n", mem_used);
-    printf("CPU time              : %g s\n", cpu_time);
-}
-
 
 //=================================================================================================
 // Garbage Collection methods:
@@ -1059,8 +947,5 @@ void Solver::garbageCollect()
     ClauseAllocator to(ca.size() - ca.wasted()); 
 
     relocAll(to);
-    if (verbosity >= 2)
-        printf("|  Garbage collection:   %12d bytes => %12d bytes             |\n", 
-               ca.size()*ClauseAllocator::Unit_Size, to.size()*ClauseAllocator::Unit_Size);
     to.moveTo(ca);
 }

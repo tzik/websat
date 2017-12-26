@@ -20,7 +20,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #ifndef Minisat_Map_h
 #define Minisat_Map_h
 
-#include "minisat/mtl/IntTypes.h"
+#include "irt/types.h"
 #include "minisat/mtl/Vec.h"
 
 namespace Minisat {
@@ -61,9 +61,9 @@ class Map {
     H          hash;
     E          equals;
 
-    vec<Pair>* table;
-    int        cap;
-    int        size;
+    vec<Pair>* table = nullptr;
+    int        cap = 0;
+    int        size = 0;
 
     // Don't allow copying (error prone):
     Map<K,D,H,E>&  operator = (Map<K,D,H,E>& other);
@@ -99,20 +99,20 @@ class Map {
     
  public:
 
-    Map () : table(NULL), cap(0), size(0) {}
-    Map (const H& h, const E& e) : hash(h), equals(e), table(NULL), cap(0), size(0){}
+    Map () {}
+    Map (const H& h, const E& e) : hash(h), equals(e) {}
     ~Map () { delete [] table; }
 
     // PRECONDITION: the key must already exist in the map.
     const D& operator [] (const K& k) const
     {
         assert(size != 0);
-        const D*         res = NULL;
+        const D*         res = nullptr;
         const vec<Pair>& ps  = table[index(k)];
         for (int i = 0; i < ps.size(); i++)
             if (equals(ps[i].key, k))
                 res = &ps[i].data;
-        assert(res != NULL);
+        assert(res);
         return *res;
     }
 
@@ -120,12 +120,12 @@ class Map {
     D& operator [] (const K& k)
     {
         assert(size != 0);
-        D*         res = NULL;
+        D*         res = nullptr;
         vec<Pair>& ps  = table[index(k)];
         for (int i = 0; i < ps.size(); i++)
             if (equals(ps[i].key, k))
                 res = &ps[i].data;
-        assert(res != NULL);
+        assert(res);
         return *res;
     }
 
@@ -152,7 +152,7 @@ class Map {
 
     // PRECONDITION: the key must exist in the map.
     void remove(const K& k) {
-        assert(table != NULL);
+        assert(table);
         vec<Pair>& ps = table[index(k)];
         int j = 0;
         for (; j < ps.size() && !equals(ps[j].key, k); j++);
@@ -165,7 +165,7 @@ class Map {
     void clear  () {
         cap = size = 0;
         delete [] table;
-        table = NULL;
+        table = nullptr;
     }
 
     int  elems() const { return size; }
@@ -179,7 +179,7 @@ class Map {
         other.cap   = cap;
         other.size  = size;
 
-        table = NULL;
+        table = nullptr;
         size = cap = 0;
     }
 

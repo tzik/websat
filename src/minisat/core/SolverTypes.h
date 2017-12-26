@@ -22,9 +22,9 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #ifndef Minisat_SolverTypes_h
 #define Minisat_SolverTypes_h
 
-#include <assert.h>
+#include "irt/assert.h"
+#include "irt/types.h"
 
-#include "minisat/mtl/IntTypes.h"
 #include "minisat/mtl/Alg.h"
 #include "minisat/mtl/Vec.h"
 #include "minisat/mtl/IntMap.h"
@@ -47,18 +47,16 @@ typedef int Var;
   const Var var_Undef = -1;
 #endif
 
-
 struct Lit {
     int     x;
-
-    // Use this as a constructor:
-    friend Lit mkLit(Var var, bool sign = false);
 
     bool operator == (Lit p) const { return x == p.x; }
     bool operator != (Lit p) const { return x != p.x; }
     bool operator <  (Lit p) const { return x < p.x;  } // '<' makes p, ~p adjacent in the ordering.
 };
 
+// Use this as a constructor:
+Lit mkLit(Var var, bool sign = false);
 
 inline  Lit  mkLit     (Var var, bool sign) { Lit p; p.x = var + var + (int)sign; return p; }
 inline  Lit  operator ~(Lit p)              { Lit q; q.x = p.x ^ 1; return q; }
@@ -95,10 +93,10 @@ class lbool {
     uint8_t value;
 
 public:
-    explicit lbool(uint8_t v) : value(v) { }
+    explicit constexpr lbool(uint8_t v) : value(v) { }
 
-    lbool()       : value(0) { }
-    explicit lbool(bool x) : value(!x) { }
+    constexpr lbool()       : value(0) { }
+    explicit constexpr lbool(bool x) : value(!x) { }
 
     bool  operator == (lbool b) const { return ((b.value&2) & (value&2)) | (!(b.value&2)&(value == b.value)); }
     bool  operator != (lbool b) const { return !(*this == b); }
@@ -125,9 +123,9 @@ inline lbool toLbool(int   v) { return lbool((uint8_t)v);  }
   #define l_False (lbool((uint8_t)1))
   #define l_Undef (lbool((uint8_t)2))
 #else
-  const lbool l_True ((uint8_t)0);
-  const lbool l_False((uint8_t)1);
-  const lbool l_Undef((uint8_t)2);
+  constexpr lbool l_True ((uint8_t)0);
+  constexpr lbool l_False((uint8_t)1);
+  constexpr lbool l_Undef((uint8_t)2);
 #endif
 
 
