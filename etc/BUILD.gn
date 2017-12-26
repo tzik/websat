@@ -111,6 +111,6 @@ toolchain("wasm") {
 
   tool("copy") {
     description = "COPY {{output}}"
-    command = "cp -l {{source}} {{output}}"
+    command = "cp -fl {{source}} {{output}}"
   }
 }

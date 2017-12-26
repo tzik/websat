@@ -1,6 +1,7 @@
 
 declare_args() {
   is_debug = true
+  for_web = false
 }
 
 set_default_toolchain("//etc:wasm")

@@ -29,10 +29,16 @@ copy("test") {
 }
 
 copy("driver") {
+  if (for_web) {
+    prefix = "web"
+  } else {
+    prefix = "d8"
+  }
+
   sources = [
     "websat.js",
-    "d8/wasm_loader.js",
-    "d8/text_decoder.js",
+    "$prefix/wasm_loader.js",
+    "$prefix/text_decoder.js",
   ]
 
   outputs = [

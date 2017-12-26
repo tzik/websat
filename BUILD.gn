@@ -2,6 +2,11 @@
 group("default") {
   deps = [
     "//src/websat",
-    "//src/websat:test",
   ]
+
+  if (!for_web) {
+    deps += [
+      "//src/websat:test",
+    ]
+  }
 }
