@@ -1,0 +1,116 @@
+
+cc = "clang"
+cxx = "clang++"
+ld = "clang"
+asm = "clang"
+ar = "llvm-ar"
+
+config("no_optimize") {
+  cflags = ["-O0"]
+}
+
+config("optimize") {
+  defines = ["NDEBUG"]
+  cflags = ["-O3"]
+}
+
+config("target_wasm") {
+  cflags = [
+    "-target", "wasm32-wasm",
+    "-nostdinc", "-nostdinc++",
+    "-fno-rtti",
+    "-Wall", "-Werror",
+    "-Wno-unused-const-variable",
+    "-Wglobal-constructors",
+  ]
+
+  ldflags = [
+    "-target", "wasm32-wasm",
+    "-nodefaultlibs", "-nostartfiles",
+    "-Wl,--import-memory",
+    "-Wl,--allow-undefined",
+    "-Wl,--no-entry"
+  ]
+}
+
+config("visibility_hidden") {
+  cflags = ["-fvisibility=hidden"]
+}
+
+config("toplevel_include_dir") {
+  include_dirs = ["//src"]
+}
+
+config("no_exception") {
+  cflags_cc = ["-fno-exceptions"]
+}
+
+config("cxx17") {
+  cflags_cc = ["-std=c++17"]
+}
+
+config("debug_symbols") {
+  cflags = ["-g"]
+}
+
+config("strip") {
+  ldflags = ["-Wl,--strip-all"]
+}
+
+toolchain("wasm") {
+  tool("cc") {
+    description = "CC {{output}}"
+    depfile = "{{output}}.deps"
+    depsformat = "gcc"
+    command = "$cc -MMD -MF $depfile {{cflags}} {{cflags_c}} {{include_dirs}} {{defines}} -c {{source}} -o {{output}}"
+    outputs = ["{{target_out_dir}}/{{label_name}}/{{source_name_part}}.o"]
+  }
+
+  tool("cxx") {
+    description = "CXX {{output}}"
+    depfile = "{{output}}.deps"
+    depsformat = "gcc"
+    command = "$cxx -MMD -MF $depfile {{cflags}} {{cflags_cc}} {{include_dirs}} {{defines}} -c {{source}} -o {{output}}"
+    outputs = ["{{target_out_dir}}/{{label_name}}/{{source_name_part}}.o"]
+  }
+
+  tool("asm") {
+    description = "ASM {{output}}"
+    depfile = "{{output}}.deps"
+    depsformat = "gcc"
+    command = "$asm -MMD -MF $depfile {{asmflags}} {{include_dirs}} {{defines}} -c {{source}} -o {{output}}"
+    outputs = ["{{target_out_dir}}/{{label_name}}/{{source_name_part}}.o"]
+  }
+
+  tool("alink") {
+    description = "AR {{output}} @{{output}}.rsp"
+    rspfile = "{{output}}.rsp"
+    rspfile_content = "{{inputs}}"
+    command = "rm -f {{output}} && $ar rcsTD {{output}} @{{output}}.rsp"
+    outputs = ["{{output_dir}}/{{target_output_name}}{{output_extension}}"]
+    default_output_dir = "{{root_out_dir}}"
+    default_output_extension = ".a"
+  }
+
+  # tool("solink") {}
+
+  tool("link") {
+    description = "LINK {{output}}"
+    rspfile = "{{output}}.rsp"
+    rspfile_content = "{{inputs}}"
+    command = "$ld {{ldflags}} -o {{output}} @{{output}}.rsp {{libs}}"
+    outputs = ["{{output_dir}}/{{target_output_name}}{{output_extension}}"]
+    default_output_dir = "{{root_out_dir}}"
+    default_output_extension = ".wasm"
+  }
+
+  tool("stamp") {
+    command = "touch {{output}}"
+    description = "STAMP {{output}}"
+  }
+
+  tool("copy") {
+    description = "COPY {{output}}"
+    command = "cp -l {{source}} {{output}}"
+  }
+}

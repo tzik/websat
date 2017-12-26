@@ -1,0 +1,34 @@
+
+declare_args() {
+  is_debug = true
+}
+
+set_default_toolchain("//etc:wasm")
+
+default_configs = [
+  "//etc:cxx17",
+  "//etc:no_exception",
+  "//etc:target_wasm",
+  "//etc:toplevel_include_dir",
+  "//etc:visibility_hidden",
+]
+
+if (is_debug) {
+  default_configs += [
+    "//etc:debug_symbols",
+    "//etc:no_optimize",
+  ]
+} else {
+  default_configs += [
+    "//etc:optimize",
+    "//etc:strip",
+  ]
+}
+
+set_defaults("static_library") {
+  configs = default_configs
+}
+
+set_defaults("executable") {
+  configs = default_configs
+}
