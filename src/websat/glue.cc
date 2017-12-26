@@ -37,5 +37,5 @@ EXPORT size_t getNVars() {
 
 EXPORT void extract(uint8_t* buf, size_t length) {
   for (size_t i = 0; i < length; ++i)
-    buf[i] = toInt(g_solver->value(i));
+    buf[i] = toInt(g_solver->modelValue(i));
 }

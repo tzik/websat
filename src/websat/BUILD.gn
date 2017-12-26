@@ -17,6 +17,8 @@ copy("test") {
   ]
 
   sources = [
+    "sudoku_test.js",
+    "sudoku_test",
     "websat_test.js",
     "websat_test",
   ]

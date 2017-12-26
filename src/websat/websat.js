@@ -62,7 +62,7 @@ export class WebSAT {
     }
 
     let m = ['true', 'false', 'undef'];
-    let res = [];
+    let res = ['undef'];
     this.solver.exports.extract(address, length);
     let buf = new Uint8Array(this.memory.buffer, address, length);
     for (let v of buf) {
