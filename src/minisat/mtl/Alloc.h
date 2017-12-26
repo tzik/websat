@@ -22,8 +22,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #define Minisat_Alloc_h
 
 #include "irt/types.h"
-#include "minisat/mtl/XAlloc.h"
-#include "minisat/mtl/Vec.h"
+#include "irt/irt.h"
 
 namespace Minisat {
 
@@ -31,101 +30,97 @@ namespace Minisat {
 // Simple Region-based memory allocator:
 
 template<class T>
-class RegionAllocator
-{
-    T*        memory = nullptr;
-    uint32_t  sz = 0;
-    uint32_t  cap = 0;
-    uint32_t  wasted_ = 0;
+class RegionAllocator {
+  T* memory = nullptr;
+  uint32_t sz = 0;
+  uint32_t cap = 0;
+  uint32_t wasted_ = 0;
 
-    void capacity(uint32_t min_cap);
+  void capacity(uint32_t min_cap);
 
  public:
-    // TODO: make this a class for better type-checking?
-    typedef uint32_t Ref;
-    enum { Ref_Undef = UINT32_MAX };
-    enum { Unit_Size = sizeof(T) };
+  // TODO: make this a class for better type-checking?
+  typedef uint32_t Ref;
+  enum { Ref_Undef = UINT32_MAX };
+  enum { Unit_Size = sizeof(T) };
 
-    explicit RegionAllocator(uint32_t start_cap = 1024*1024) { capacity(start_cap); }
-    ~RegionAllocator()
-    {
-        ::free(memory);
-    }
+  explicit RegionAllocator(uint32_t start_cap = 1024*1024) {
+    capacity(start_cap);
+  }
 
+  ~RegionAllocator() {
+    ::free(memory);
+  }
 
-    uint32_t size      () const      { return sz; }
-    uint32_t wasted    () const      { return wasted_; }
+  uint32_t size() const { return sz; }
+  uint32_t wasted() const { return wasted_; }
 
-    Ref      alloc     (int size); 
-    void     free      (int size)    { wasted_ += size; }
+  Ref alloc(int size); 
+  void free(int size){ wasted_ += size; }
 
-    // Deref, Load Effective Address (LEA), Inverse of LEA (AEL):
-    T&       operator[](Ref r)       { assert(r < sz); return memory[r]; }
-    const T& operator[](Ref r) const { assert(r < sz); return memory[r]; }
+  // Deref, Load Effective Address (LEA), Inverse of LEA (AEL):
+  T& operator[](Ref r) { assert(r < sz); return memory[r]; }
+  const T& operator[](Ref r) const { assert(r < sz); return memory[r]; }
 
-    T*       lea       (Ref r)       { assert(r < sz); return &memory[r]; }
-    const T* lea       (Ref r) const { assert(r < sz); return &memory[r]; }
-    Ref      ael       (const T* t)  { assert((void*)t >= (void*)&memory[0] && (void*)t < (void*)&memory[sz-1]);
-        return  (Ref)(t - &memory[0]); }
+  T* lea(Ref r) { assert(r < sz); return &memory[r]; }
+  const T* lea(Ref r) const { assert(r < sz); return &memory[r]; }
+  Ref ael(const T* t) {
+    assert((void*)t >= (void*)&memory[0]);
+    assert((void*)t < (void*)&memory[sz-1]);
+    return (Ref)(t - &memory[0]);
+  }
 
-    void     moveTo(RegionAllocator& to) {
-        ::free(to.memory);
-        to.memory = memory;
-        to.sz = sz;
-        to.cap = cap;
-        to.wasted_ = wasted_;
+  void moveTo(RegionAllocator& to) {
+    ::free(to.memory);
+    to.memory = memory;
+    to.sz = sz;
+    to.cap = cap;
+    to.wasted_ = wasted_;
 
-        memory = nullptr;
-        sz = cap = wasted_ = 0;
-    }
-
-
+    memory = nullptr;
+    sz = cap = wasted_ = 0;
+  }
 };
 
 template<class T>
-void RegionAllocator<T>::capacity(uint32_t min_cap)
-{
-    if (cap >= min_cap) return;
+void RegionAllocator<T>::capacity(uint32_t min_cap) {
+  if (cap >= min_cap) return;
 
-    uint32_t prev_cap = cap;
-    while (cap < min_cap){
-        // NOTE: Multiply by a factor (13/8) without causing overflow, then add 2 and make the
-        // result even by clearing the least significant bit. The resulting sequence of capacities
-        // is carefully chosen to hit a maximum capacity that is close to the '2^32-1' limit when
-        // using 'uint32_t' as indices so that as much as possible of this space can be used.
-        uint32_t delta = ((cap >> 1) + (cap >> 3) + 2) & ~1;
-        cap += delta;
+  uint32_t prev_cap = cap;
+  while (cap < min_cap){
+    // NOTE: Multiply by a factor (13/8) without causing overflow, then add 2 and make the
+    // result even by clearing the least significant bit. The resulting sequence of capacities
+    // is carefully chosen to hit a maximum capacity that is close to the '2^32-1' limit when
+    // using 'uint32_t' as indices so that as much as possible of this space can be used.
+    uint32_t delta = ((cap >> 1) + (cap >> 3) + 2) & ~1;
+    cap += delta;
 
-        if (cap <= prev_cap)
-            trap("OOM");
-    }
-    // printf(" .. (%p) cap = %u\n", this, cap);
+    if (cap <= prev_cap)
+      trap("OOM");
+  }
 
-    assert(cap > 0);
-    memory = (T*)xrealloc(memory, sizeof(T)*cap);
+  assert(cap > 0);
+  memory = (T*)realloc(memory, sizeof(T) * cap);
+  if (!memory)
+    trap("OOM");
 }
-
 
 template<class T>
 typename RegionAllocator<T>::Ref
-RegionAllocator<T>::alloc(int size)
-{ 
-    // printf("ALLOC called (this = %p, size = %d)\n", this, size); fflush(stdout);
-    assert(size > 0);
-    capacity(sz + size);
+RegionAllocator<T>::alloc(int size) { 
+  assert(size > 0);
+  capacity(sz + size);
 
-    uint32_t prev_sz = sz;
-    sz += size;
+  uint32_t prev_sz = sz;
+  sz += size;
     
-    // Handle overflow:
-    if (sz < prev_sz)
-        trap("OOM");
+  // Handle overflow:
+  if (sz < prev_sz)
+    trap("OOM");
 
-    return prev_sz;
+  return prev_sz;
 }
 
-
-//=================================================================================================
-}
+}  // namespace Minisat
 
 #endif

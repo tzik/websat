@@ -15,6 +15,5 @@ static_library("minisat") {
     "mtl/Map.h",
     "mtl/Sort.h",
     "mtl/Vec.h",
-    "mtl/XAlloc.h",
   ]
 }

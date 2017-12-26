@@ -23,8 +23,6 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include "irt/assert.h"
 
-#include "minisat/mtl/XAlloc.h"
-
 namespace Minisat {
 
 //=================================================================================================
@@ -34,100 +32,158 @@ namespace Minisat {
 
 template<class T>
 class vec {
-public:
-    typedef int Size;
-private:
-    T*   data = nullptr;
-    int sz = 0;
-    int cap = 0;
+ public:
+  typedef int Size;
+ private:
+  T* data = nullptr;
+  int sz = 0;
+  int cap = 0;
 
-    // Don't allow copying (error prone):
-    vec<T>&  operator=(vec<T>& other);
-             vec      (vec<T>& other);
+  // Don't allow copying (error prone):
+  vec<T>& operator=(vec<T>& other) = delete;
+  vec(vec<T>& other) = delete;
+  
+  static inline int max(int x, int y){ return (x > y) ? x : y; }
 
-    static inline int max(int x, int y){ return (x > y) ? x : y; }
+ public:
+  // Constructors:
+  vec() {}
+  explicit vec(int size) { growTo(size); }
+  vec(int size, const T& pad) { growTo(size, pad); }
+  ~vec() { clear(true); }
 
-public:
-    // Constructors:
-    vec()                       { }
-    explicit vec(int size)      { growTo(size); }
-    vec(int size, const T& pad) { growTo(size, pad); }
-   ~vec()                       { clear(true); }
+  // Pointer to first element:
+  operator T*() { return data; }
 
-    // Pointer to first element:
-    operator T*       (void)    { return data; }
+  int size() const { return sz; }
 
-    // int operations:
-    int  size     (void) const { return sz; }
-    void shrink   (int nelems) { assert(nelems <= sz); for (int i = 0; i < nelems; i++) sz--, data[sz].~T(); }
-    void shrink_  (int nelems) { assert(nelems <= sz); sz -= nelems; }
-    int  capacity (void) const { return cap; }
-    void capacity (int min_cap);
-    void growTo   (int size);
-    void growTo   (int size, const T& pad);
-    void clear    (bool dealloc = false);
+  void shrink(int nelems) {
+    assert(nelems <= sz);
+    for (int i = 0; i < nelems; i++) {
+      sz--;
+      data[sz].~T();
+    }
+  }
 
-    // Stack interface:
-    void     push  (void)              { if (sz == cap) capacity(sz+1); new (&data[sz]) T(); sz++; }
-    //void     push  (const T& elem)     { if (sz == cap) capacity(sz+1); data[sz++] = elem; }
-    void     push  (const T& elem)     { if (sz == cap) capacity(sz+1); new (&data[sz++]) T(elem); }
-    void     push_ (const T& elem)     { assert(sz < cap); data[sz++] = elem; }
-    void     pop   (void)              { assert(sz > 0); sz--, data[sz].~T(); }
-    // NOTE: it seems possible that overflow can happen in the 'sz+1' expression of 'push()', but
-    // in fact it can not since it requires that 'cap' is equal to INT_MAX. This in turn can not
-    // happen given the way capacities are calculated (below). Essentially, all capacities are
-    // even, but INT_MAX is odd.
+  void shrink_(int nelems) {
+    assert(nelems <= sz);
+    sz -= nelems;
+  }
 
-    const T& last  (void) const        { return data[sz-1]; }
-    T&       last  (void)              { return data[sz-1]; }
+  int capacity() const {
+    return cap;
+  }
 
-    // Vector interface:
-    const T& operator [] (int index) const { return data[index]; }
-    T&       operator [] (int index)       { return data[index]; }
+  void capacity(int min_cap);
+  void growTo(int size);
+  void growTo(int size, const T& pad);
+  void clear(bool dealloc = false);
 
-    // Duplicatation (preferred instead):
-    void copyTo(vec<T>& copy) const { copy.clear(); copy.growTo(sz); for (int i = 0; i < sz; i++) copy[i] = data[i]; }
-    void moveTo(vec<T>& dest) { dest.clear(true); dest.data = data; dest.sz = sz; dest.cap = cap; data = nullptr; sz = 0; cap = 0; }
+  // Stack interface:
+  void push() {
+    if (sz == cap)
+      capacity(sz+1);
+    new (&data[sz]) T();
+    sz++;
+  }
+
+  void push(const T& elem) {
+    if (sz == cap)
+      capacity(sz+1);
+    new (&data[sz++]) T(elem);
+  }
+
+  void push_(const T& elem) {
+    assert(sz < cap);
+    data[sz++] = elem;
+  }
+
+  void pop() {
+    assert(sz > 0);
+    sz--;
+    data[sz].~T();
+  }
+
+  // NOTE: it seems possible that overflow can happen in the 'sz+1' expression
+  // of 'push()', but in fact it can not since it requires that 'cap' is equal
+  // to INT_MAX. This in turn can not happen given the way capacities are
+  // calculated (below). Essentially, all capacities are even, but INT_MAX is
+  // odd.
+  const T& last() const { return data[sz-1]; }
+  T& last() { return data[sz-1]; }
+  
+  // Vector interface:
+  const T& operator [] (int index) const { return data[index]; }
+  T& operator [] (int index) { return data[index]; }
+
+  // Duplicatation (preferred instead):
+  void copyTo(vec<T>& copy) const {
+    copy.clear();
+    copy.growTo(sz);
+    for (int i = 0; i < sz; i++)
+      copy[i] = data[i];
+  }
+
+  void moveTo(vec<T>& dest) {
+    dest.clear(true);
+    dest.data = data;
+    dest.sz = sz;
+    dest.cap = cap;
+    data = nullptr;
+    sz = 0;
+    cap = 0;
+  }
 };
-
 
 template<class T>
 void vec<T>::capacity(int min_cap) {
-    if (cap >= min_cap) return;
-    int add = max((min_cap - cap + 1) & ~1, ((cap >> 1) + 2) & ~1);   // NOTE: grow by approximately 3/2
-    if (add > INT_MAX - cap)
-        trap("OOM");
-    cap += add;
-    data = (T*)::realloc(data, cap * sizeof(T));
-    if (!data)
-        trap("OOM");
+  if (cap >= min_cap)
+    return;
+  // NOTE: grow by approximately 3/2
+  int add = max((min_cap - cap + 1) & ~1, ((cap >> 1) + 2) & ~1);
+  if (add > INT_MAX - cap)
+    trap("OOM");
+  cap += add;
+  data = (T*)::realloc(data, cap * sizeof(T));
+  if (!data)
+    trap("OOM");
  }
 
 
 template<class T>
 void vec<T>::growTo(int size, const T& pad) {
-    if (sz >= size) return;
-    capacity(size);
-    for (int i = sz; i < size; i++) data[i] = pad;
-    sz = size; }
-
+  if (sz >= size)
+    return;
+  capacity(size);
+  for (int i = sz; i < size; i++)
+    data[i] = pad;
+  sz = size;
+}
 
 template<class T>
 void vec<T>::growTo(int size) {
-    if (sz >= size) return;
-    capacity(size);
-    for (int i = sz; i < size; i++) new (&data[i]) T();
-    sz = size; }
-
+  if (sz >= size) return;
+  capacity(size);
+  for (int i = sz; i < size; i++)
+    new (&data[i]) T();
+  sz = size;
+}
 
 template<class T>
 void vec<T>::clear(bool dealloc) {
-    if (data){
-        for (int i = 0; i < sz; i++) data[i].~T();
-        sz = 0;
-        if (dealloc) free(data), data = nullptr, cap = 0; } }
+  if (!data)
+    return;
 
-//=================================================================================================
+  for (int i = 0; i < sz; i++)
+    data[i].~T();
+  sz = 0;
+  if (dealloc) {
+    free(data);
+    data = nullptr;
+    cap = 0;
+  }
+}
+
 }
 
 #endif
