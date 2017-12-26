@@ -9,3 +9,31 @@ executable("websat") {
     "glue.cc",
   ]
 }
+
+copy("test") {
+  deps = [
+    ":websat",
+    ":driver",
+  ]
+
+  sources = [
+    "websat_test.js",
+    "websat_test",
+  ]
+
+  outputs = [
+    "$root_out_dir/{{source_file_part}}"
+  ]
+}
+
+copy("driver") {
+  sources = [
+    "websat.js",
+    "d8/wasm_loader.js",
+    "d8/text_decoder.js",
+  ]
+
+  outputs = [
+    "$root_out_dir/{{source_file_part}}"
+  ]
+}

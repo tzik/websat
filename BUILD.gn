@@ -2,5 +2,6 @@
 group("default") {
   deps = [
     "//src/websat",
+    "//src/websat:test",
   ]
 }

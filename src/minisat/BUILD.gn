@@ -1,0 +1,20 @@
+
+static_library("minisat") {
+  deps = [
+    "../irt",
+  ]
+
+  sources = [
+    "core/Solver.cc",
+    "core/Solver.h",
+    "core/SolverTypes.h",
+    "mtl/Alg.h",
+    "mtl/Alloc.h",
+    "mtl/Heap.h",
+    "mtl/IntMap.h",
+    "mtl/Map.h",
+    "mtl/Sort.h",
+    "mtl/Vec.h",
+    "mtl/XAlloc.h",
+  ]
+}
