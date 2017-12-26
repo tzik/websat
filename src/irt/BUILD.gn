@@ -1,0 +1,14 @@
+
+static_library("irt") {
+  sources = [
+    "assert.h",
+    "assert.cc",
+    "env.h",
+    "ffi.h",
+    "irt.cc",
+    "irt.h",
+    "malloc.cc",
+    "malloc.h",
+    "types.h",
+  ]
+}

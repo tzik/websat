@@ -1,5 +1,9 @@
 
 executable("websat") {
+  deps = [
+    "../irt",
+  ]
+
   sources = [
     "glue.cc",
   ]
