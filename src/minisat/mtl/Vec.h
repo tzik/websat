@@ -21,6 +21,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #ifndef Minisat_Vec_h
 #define Minisat_Vec_h
 
+#include "irt/utility.h"
 #include "irt/assert.h"
 
 namespace Minisat {
@@ -40,12 +41,29 @@ class vec {
   int cap = 0;
 
   // Don't allow copying (error prone):
-  vec<T>& operator=(vec<T>& other) = delete;
-  vec(vec<T>& other) = delete;
+  vec(const vec<T>& other) = delete;
+  vec<T>& operator=(const vec<T>& other) = delete;
   
-  static inline int max(int x, int y){ return (x > y) ? x : y; }
-
  public:
+  vec(vec<T>&& other) {
+    swap(other);
+  }
+
+  vec<T>& operator=(vec<T>&& other) {
+    vec<T> tmp(std::move(other));
+    swap(tmp);
+    return *this;
+  }
+
+  static int max(int x, int y){ return (x > y) ? x : y; }
+
+  void swap(vec<T>& other) {
+    using std::swap;
+    swap(data, other.data);
+    swap(sz, other.sz);
+    swap(cap, other.cap);
+  }
+
   // Constructors:
   vec() {}
   explicit vec(int size) { growTo(size); }

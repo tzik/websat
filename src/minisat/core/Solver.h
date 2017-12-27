@@ -46,18 +46,7 @@ public:
   void releaseVar(Lit l);
 
   // Add a clause to the solver.
-  bool addClause(const vec<Lit>& ps);
-
-  // Add the empty clause, making the solver contradictory.
-  bool addEmptyClause();
-  bool addClause(Lit p);
-  bool addClause(Lit p, Lit q);
-  bool addClause(Lit p, Lit q, Lit r);
-  bool addClause(Lit p, Lit q, Lit r, Lit s);
-
-  // Add a clause to the solver without making superflous internal copy. Will
-  // change the passed vector 'ps'.
-  bool addClause_(vec<Lit>& ps);
+  bool addClause(vec<Lit> ps);
 
   // Solving:
   //
@@ -65,16 +54,10 @@ public:
   bool simplify();
 
   // Search for a model that respects a given set of assumptions.
-  bool solve(const vec<Lit>& assumps);
+  bool solve(const vec<Lit>& assumptions = vec<Lit>());
 
   // Search for a model that respects a given set of assumptions (With resource constraints).
-  lbool solveLimited (const vec<Lit>& assumps);
-
-  // Search without assumptions.
-  bool solve();
-  bool solve(Lit p);
-  bool solve(Lit p, Lit q);
-  bool solve(Lit p, Lit q, Lit r);
+  lbool solveLimited(const vec<Lit>& assumptions);
 
   // FALSE means solver is in a conflicting state
   bool okay() const;
@@ -145,38 +128,38 @@ public:
 
   // Mode of operation:
   //
-  int verbosity;
-  double var_decay;
-  double clause_decay;
-  double random_var_freq;
+  const int verbosity;
+  const double var_decay;
+  const double clause_decay;
+  const double random_var_freq;
   double random_seed;
   bool luby_restart;
 
   // Controls conflict clause minimization (0=none, 1=basic, 2=deep).
-  int ccmin_mode;
+  const int ccmin_mode;
 
   // Controls the level of phase saving (0=none, 1=limited, 2=full).
-  int phase_saving;
+  const int phase_saving;
 
   // Use random polarities for branching heuristics.
-  bool rnd_pol;
+  const bool rnd_pol;
 
   // Initialize variable activities with a small random value.
-  bool rnd_init_act;
+  const bool rnd_init_act;
 
   // The fraction of wasted memory allowed before a garbage collection is
   // triggered.
-  double garbage_frac;
+  const double garbage_frac;
 
   // Minimum number to set the learnts limit to.
-  int min_learnts_lim;
+  const int min_learnts_lim;
 
   // The initial restart limit. (default 100)
-  int restart_first;
+  const int restart_first;
 
   // The factor with which the restart limit is multiplied in each restart.
   // (default 1.5)
-  double restart_inc;
+  const double restart_inc;
 
   // The intitial limit for learnt clauses is a factor of the original clauses.
   // (default 1 / 3)
@@ -259,7 +242,7 @@ public:
 
   // A priority queue of variables ordered with respect to the variable
   // activity.
-  Heap<Var,VarOrderLt>order_heap;
+  Heap<Var,VarOrderLt> order_heap;
 
   // If FALSE, the constraints are already unsatisfiable. No part of the solver
   // state may be used!
@@ -295,7 +278,6 @@ public:
   VMap<char> seen;
   vec<ShrinkStackElem> analyze_stack;
   vec<Lit> analyze_toclear;
-  vec<Lit> add_tmp;
 
   double max_learnts;
   double learntsize_adjust_confl;
@@ -333,8 +315,6 @@ public:
   bool litRedundant(Lit p);
   // Search for a given number of conflicts.
   lbool search(int nof_conflicts, const vec<Lit>& assumptions);
-  // Main solve method (assumptions given in 'assumptions').
-  lbool solve_(const vec<Lit>& assumptions);
   // Reduce the set of learnt clauses.
   void reduceDB();
   // Shrink 'cs' to contain only non-satisfied clauses.
@@ -436,7 +416,7 @@ inline void Solver::claBumpActivity (Clause& c) {
   }
 }
 
-inline void Solver::checkGarbage(void) { return checkGarbage(garbage_frac); }
+inline void Solver::checkGarbage() { return checkGarbage(garbage_frac); }
 inline void Solver::checkGarbage(double gf) {
   if (ca.wasted() > ca.size() * gf)
     garbageCollect();
@@ -448,46 +428,6 @@ inline bool Solver::enqueue(Lit p, CRef from) {
     return value(p) != l_False;
   uncheckedEnqueue(p, from);
   return true;
-}
-
-inline bool Solver::addClause(const vec<Lit>& ps) {
-  ps.copyTo(add_tmp);
-  return addClause_(add_tmp);
-}
-
-inline bool Solver::addEmptyClause() {
-  add_tmp.clear();
-  return addClause_(add_tmp);
-}
-
-inline bool Solver::addClause(Lit p) {
-  add_tmp.clear();
-  add_tmp.push(p);
-  return addClause_(add_tmp);
-}
-
-inline bool Solver::addClause(Lit p, Lit q) {
-  add_tmp.clear();
-  add_tmp.push(p);
-  add_tmp.push(q);
-  return addClause_(add_tmp);
-}
-
-inline bool Solver::addClause(Lit p, Lit q, Lit r) {
-  add_tmp.clear();
-  add_tmp.push(p);
-  add_tmp.push(q);
-  add_tmp.push(r);
-  return addClause_(add_tmp);
-}
-
-inline bool Solver::addClause(Lit p, Lit q, Lit r, Lit s) {
-  add_tmp.clear();
-  add_tmp.push(p);
-  add_tmp.push(q);
-  add_tmp.push(r);
-  add_tmp.push(s);
-  return addClause_(add_tmp);
 }
 
 inline bool Solver::isRemoved(CRef cr) const { return ca[cr].mark() == 1; }
@@ -544,46 +484,9 @@ inline bool Solver::withinBudget() const {
       (propagation_budget < 0 || propagations < (uint64_t)propagation_budget);
 }
 
-// FIXME: after the introduction of asynchronous interrruptions the solve-versions that return a
-// pure bool do not give a safe interface. Either interrupts must be possible to turn off here, or
-// all calls to solve must return an 'lbool'. I'm not yet sure which I prefer.
-inline bool Solver::solve(){
-  budgetOff();
-  vec<Lit> assumptions;
-  return solve_(assumptions) == l_True;
-}
-
-inline bool Solver::solve(Lit p) {
-  budgetOff();
-  vec <Lit> assumptions;
-  assumptions.push(p);
-  return solve_(assumptions) == l_True;
-}
-
-inline bool Solver::solve(Lit p, Lit q) {
-  budgetOff();
-  vec <Lit> assumptions;
-  assumptions.push(p);
-  assumptions.push(q);
-  return solve_(assumptions) == l_True;
-}
-
-inline bool Solver::solve(Lit p, Lit q, Lit r) {
-  budgetOff();
-  vec <Lit> assumptions;
-  assumptions.push(p);
-  assumptions.push(q);
-  assumptions.push(r);
-  return solve_(assumptions) == l_True;
-}
-
 inline bool Solver::solve(const vec<Lit>& assumptions) {
   budgetOff();
-  return solve_(assumptions) == l_True;
-}
-
-inline lbool Solver::solveLimited(const vec<Lit>& assumptions){
-  return solve_(assumptions);
+  return solveLimited(assumptions) == l_True;
 }
 
 inline bool Solver::okay() const { return ok; }

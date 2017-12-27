@@ -19,7 +19,7 @@ EXPORT void addClause(int32_t* clause, size_t length) {
     int32_t x = clause[i];
     c.push(Minisat::mkLit((x < 0 ? -x : x) - 1, x < 0));
   }
-  g_solver->addClause(c);
+  g_solver->addClause(std::move(c));
 }
 
 EXPORT void reset() {

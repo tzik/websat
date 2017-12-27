@@ -142,14 +142,17 @@ Var Solver::newVar(lbool upol, bool dvar) {
 // releases of the same variable).
 void Solver::releaseVar(Lit l) {
   if (value(l) == l_Undef){
-    addClause(l);
+    vec<Lit> c;
+    c.push(l);
+    addClause(std::move(c));
     released_vars.push(var(l));
   }
 }
 
-bool Solver::addClause_(vec<Lit>& ps) {
+bool Solver::addClause(vec<Lit> ps) {
   assert(decisionLevel() == 0);
-  if (!ok) return false;
+  if (!ok)
+    return false;
 
   // Check if clause is satisfied and remove false/duplicate literals:
   sort(ps);
@@ -496,7 +499,7 @@ void Solver::analyzeFinal(Lit p, LSet& out_conflict) {
 
 void Solver::uncheckedEnqueue(Lit p, CRef from) {
   assert(value(p) == l_Undef);
-  assigns[var(p)] = lbool(!sign(p));
+  assigns[var(p)] = lbool::fromBool(!sign(p));
   vardata[var(p)] = mkVarData(from, decisionLevel());
   trail.push_(p);
 }
@@ -843,7 +846,7 @@ static double luby(double y, int x) {
 }
 
 // NOTE: assumptions passed in member-variable 'assumptions'.
-lbool Solver::solve_(const vec<Lit>& assumptions) {
+lbool Solver::solveLimited(const vec<Lit>& assumptions) {
   model.clear();
   conflict.clear();
   if (!ok) return l_False;
